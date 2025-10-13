@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:Karttest"
         xmlns:mapsui="clr-namespace:Mapsui.UI.Wpf;assembly=Mapsui.UI.Wpf"
         mc:Ignorable="d"
-        Title="MainWindow" Height="800" Width="800">
+        Title="MainWindow" Height="1200" Width="1200">
     <Grid x:Name="MainGrid">
         
         <mapsui:MapControl x:Name="MapControl"/>
