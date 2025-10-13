@@ -1,0 +1,55 @@
+# --- .NET / Visual Studio / Rider (safe to ignore) ---
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+**/artifacts/
+**/Debug/
+**/Release/
+
+# VS & tooling
+.vs/
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test results & coverage
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet (packages folder for legacy projects)
+packages/
+*.nupkg
+# Local NuGet cache/output (optional; keep if you pack locally)
+# .nuget/
+
+# Resharper/Rider caches (big + generated)
+_ReSharper.Caches/
+.idea/
+
+# Logs & misc
+*.log
+*.tlog
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# --- Your existing entries ---
+# Default ignored files
+/shelf/
+/workspace.xml
+# Rider ignored files
+/contentModel.xml
+/.idea.Karttest.iml
+/modules.xml
+/projectSettingsUpdater.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
