@@ -3,42 +3,63 @@ using System.Windows;
 using System.Windows.Input;
 using Mapsui;
 using Mapsui.Extensions;
+using Mapsui.Manipulations;
 using Mapsui.Nts;
 using Mapsui.Nts.Editing;
+using Mapsui.Nts.Extensions;
 using Mapsui.Styles;
 using NetTopologySuite.Geometries;
+using Point = System.Windows.Point;
 
 namespace Karttest;
 
-/// <summary>
-/// Interaction logic for MainWindow.xaml
-/// </summary>
+public enum EditStatus
+{
+    None,
+    Error,
+    Accepted,
+    Finished,
+    Editing
+}
+
 public partial class MainWindow : Window
 {
-    private Mapsui.Nts.Editing.EditManager? editManager;
+    private EditManager? editManager;
     private Mapsui.Nts.Widgets.EditingWidget? editingWidget;
-    private Mapsui.Layers.WritableLayer? editLayer;
-    // private Mapsui.UI.Wpf.MapControl? mapControl;
+    private readonly Mapsui.Layers.WritableLayer? editLayer;
+    private readonly Mapsui.Layers.WritableLayer? polygonLayer;
 
-    private VectorStyle errorVectorStyle = new VectorStyle
+    private readonly VectorStyle errorVectorStyle = new VectorStyle
     {
-        Fill = new Mapsui.Styles.Brush(Mapsui.Styles.Color.Red),
-        Outline = new Pen(Color.Yellow, 5),
+        Fill = new Brush(Color.FromRgba(236, 29, 28, 200)),
+        Outline = new Pen(Color.FromRgba(236, 29, 28, 255), 5),
     };
 
-    private VectorStyle drawingVectorStyle = new VectorStyle
+    private readonly VectorStyle acceptedVectorStyle = new VectorStyle
     {
-        Line = new Pen(Color.AliceBlue, 5),
-        Fill = new Brush(Color.Purple),
-        Outline = new Pen(Color.HotPink, 5),
+        Fill = new Brush(Color.FromRgba(16, 230, 66, 200)),
+        Outline = new Pen(Color.FromRgba(16, 230, 66, 255), 5),
+    };
+    
+    private readonly VectorStyle finishedVectorStyle = new VectorStyle
+    {
+        Fill = new Brush(Color.FromRgba(149, 166, 203, 200)),
+        Outline = new Pen(Color.FromRgba(149, 166, 203, 255), 5),
     };
 
-    private SymbolStyle vertexStyle = new SymbolStyle
+    private readonly VectorStyle editingVectorStyle = new VectorStyle
     {
-        SymbolType = SymbolType.Rectangle,
-        Fill = new Brush(Color.Black),
-        Outline = new Pen(Color.DarkBlue, 5),
-        SymbolScale = 1.0
+        Line = new Pen(Color.FromRgba(61, 61, 60, 255), 2),
+        Fill = new Brush(Color.FromRgba(158, 158, 129, 200)),
+        Outline = new Pen(Color.FromRgba(158, 158, 129, 255), 5),
+    };
+
+    private readonly SymbolStyle vertexStyle = new SymbolStyle
+    {
+        SymbolType = SymbolType.Ellipse,
+        Fill = new Brush(Color.FromRgba(124, 149, 156, 200)),
+        Outline = new Pen(Color.FromRgba(124, 149, 156, 255), 2),
+        SymbolScale = 0.5
     };
 
     public MainWindow()
@@ -50,32 +71,26 @@ public partial class MainWindow : Window
 
         MapControl.Map ??= new Mapsui.Map();
         MapControl.Map?.Layers.Add(Mapsui.Tiling.OpenStreetMap.CreateTileLayer());
-
-        // Create edit layer for drawing
+        
         editLayer = new Mapsui.Layers.WritableLayer
         {
-            Name = "EditLayer",
-            Style = new Mapsui.Styles.VectorStyle
-            {
-                Fill = new Mapsui.Styles.Brush(Mapsui.Styles.Color.FromString("rgba(255, 0, 0, 0.3)")),
-                Line = new Mapsui.Styles.Pen(Mapsui.Styles.Color.FromString("Red"), 3)
-            }
+            Name = "EditLayer"
         };
         MapControl.Map?.Layers.Add(editLayer);
 
-        // Convert lat/lon to spherical mercator coordinates
-        var (x, y) = Mapsui.Projections.SphericalMercator.FromLonLat(longitude, latitude);
+        polygonLayer = new Mapsui.Layers.WritableLayer
+        {
+            Name = "PolygonLayer"
+        };
+        MapControl.Map?.Layers.Add(polygonLayer);
+        
+        (double x, double y) = Mapsui.Projections.SphericalMercator.FromLonLat(longitude, latitude);
         var sphericalMercatorCoordinate = new Mapsui.MPoint(x, y);
-
-        // Set initial map position and zoom level
+        
         MapControl.Map?.Navigator.CenterOn(sphericalMercatorCoordinate);
-        MapControl.Map?.Navigator.ZoomTo(5); // Resolution in map units (lower = more zoomed in)
-
-        // Add map to the grid (insert at index 0 so button stays on top)
-        // MainGrid.Children.Insert(0, MapControl);
-
-        // Disable stop button initially since edit mode is not active
-        StopEditButton.IsEnabled = false;
+        MapControl.Map?.Navigator.ZoomTo(5);
+        
+        CancelEditButton.IsEnabled = false;
 
         MapControl.PreviewMouseRightButtonUp += MapControl_PreviewMouseRightUp;
         MapControl.PreviewMouseLeftButtonDown += MapControl_PreviewMouseLeftDown;
@@ -89,38 +104,92 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (editStatus == EditStatus.Finished)
+        {
+            e.Handled = true;
+            return;
+        }
+
         Polygon? polygon = GetCurrentSketchPolygon();
         if (polygon == null)
         {
             return;
         }
 
+        if (polygon.Coordinates.Length > 2)
+        {
+            Point worldPoint = e.GetPosition(MapControl);
+            MapInfo? mapInfo = MapControl.GetMapInfo(new ScreenPosition(worldPoint.X, worldPoint.Y), [editLayer]);
+            MPoint? world = mapInfo?.WorldPosition;
+            double pixelTolerance = 20.0 * MapControl.Map.Navigator.Viewport.Resolution;
+            bool isClosingClick = world != null && GeometryHelpers.IsNear(polygon.Coordinates[0], world, pixelTolerance);
+            if (isClosingClick)
+            {
+                EditStatus = EditStatus.Accepted;    
+            }
+            else
+            {
+                EditStatus = EditStatus.Editing;
+            }
+        }
+        
         if (HasPolygonCrossingLines(polygon))
         {
-            if (!HasError)
+            if (!EditStatus.Equals(EditStatus.Error))
             {
-                HasError = true;
+                EditStatus = EditStatus.Error;
             }
         }
         else
         {
-            if (HasError)
+            if (EditStatus.Equals(EditStatus.Error))
             {
-                HasError = false;
+                EditStatus = EditStatus.Editing;
             }
         }
+    }
+
+    private static Polygon? BuildCandidatePolygon(List<Coordinate> openRing, bool forceClose)
+    {
+        if (openRing.Count < 3) return null;
+        var ringCoords = new List<Coordinate>(openRing);
+
+        if (forceClose && !ringCoords[0].Equals2D(ringCoords[^1]))
+            ringCoords.Add(ringCoords[0]);
+
+        if (!ringCoords[0].Equals2D(ringCoords[^1]))
+            return null;
+
+        var ring = new LinearRing(ringCoords.ToArray());
+        if (!ring.IsValid) return null; // invalid ring shape
+        return new Polygon(ring);
     }
 
     private void MapControl_PreviewMouseLeftDown(object sender, MouseButtonEventArgs e)
     {
         Debug.WriteLine("Left mouse button down");
 
-        if (editManager?.EditMode != EditMode.AddPolygon && editManager?.EditMode != EditMode.DrawingPolygon)
+        if (editStatus == EditStatus.Accepted)
+        {
+            e.Handled = true;
+            
+            Point worldPoint = e.GetPosition(MapControl);
+            MapInfo? mapInfo = MapControl.GetMapInfo(new ScreenPosition(worldPoint.X, worldPoint.Y), [editLayer]);
+            MPoint? coordinatePoint = mapInfo?.WorldPosition;
+
+            this.editManager?.AddVertex(coordinatePoint?.ToCoordinate());
+            this.editManager.EditMode = EditMode.None;
+            EditStatus = EditStatus.Finished;
+            return;
+        }
+
+        if (editManager?.EditMode != EditMode.AddPolygon && 
+            editManager?.EditMode != EditMode.DrawingPolygon)
         {
             return;
         }
 
-        if (HasError)
+        if (EditStatus == EditStatus.Error)
         {
             e.Handled = true;
         }
@@ -129,10 +198,10 @@ public partial class MainWindow : Window
     private void MapControl_PreviewMouseRightUp(object sender, MouseButtonEventArgs e)
     {
         Debug.WriteLine("Right mouse button down");
-        EndEdit();
+        CancelEdit();
     }
 
-    private bool HasPolygonCrossingLines(Polygon polygon)
+    private bool HasPolygonCrossingLines(Polygon? polygon)
     {
         var isCrossing = false;
 
@@ -158,60 +227,12 @@ public partial class MainWindow : Window
                     segments.Add(new LineSegment(lastCoordinate, firstCoordinate));
                 }
 
-                isCrossing = vertices.Any(p => IsCrossing(segments, new MPoint(p.X, p.Y)));
+                isCrossing = vertices.Any(p => GeometryHelpers.IsCrossing(segments, new MPoint(p.X, p.Y)));
             }
         }
 
         return isCrossing;
     }
-
-    private static bool IsCrossing(List<LineSegment> segments, MPoint pointMoved)
-    {
-        // eps is a tolerance in map units(EPSG:3857 = meters). 0.01 ≈ 1 cm; adjust if needed.
-        // TODO: Verify this with a test, this is AI doing
-
-        double eps = 0.01;
-
-        if (segments == null || segments.Count <= 2)
-            return false;
-
-        var touching = segments.Where(s => IsEndpointOf(s, pointMoved, eps)).ToList();
-        if (touching.Count == 0) return false;
-
-        var others = segments.Except(touching).ToList();
-
-        foreach (var segA in touching)
-        {
-            foreach (var segB in others)
-            {
-                if (ShareEndpoint(segA, segB, eps))
-                    continue;
-
-                var crosses = CrossingLines(
-                    segA.P1.X, segA.P1.Y,
-                    segA.P0.X, segA.P0.Y,
-                    segB.P1.X, segB.P1.Y,
-                    segB.P0.X, segB.P0.Y);
-
-                if (crosses) return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsEndpointOf(LineSegment s, MPoint p, double eps)
-        => AlmostEqual(s.P0, p, eps) || AlmostEqual(s.P1, p, eps);
-
-    private static bool ShareEndpoint(LineSegment a, LineSegment b, double eps)
-        => AlmostEqual(a.P0, b.P0, eps) || AlmostEqual(a.P0, b.P1, eps)
-                                        || AlmostEqual(a.P1, b.P0, eps) || AlmostEqual(a.P1, b.P1, eps);
-
-    private static bool AlmostEqual(Coordinate c, MPoint p, double eps)
-        => Math.Abs(c.X - p.X) <= eps && Math.Abs(c.Y - p.Y) <= eps;
-
-    private static bool AlmostEqual(Coordinate a, Coordinate b, double eps)
-        => Math.Abs(a.X - b.X) <= eps && Math.Abs(a.Y - b.Y) <= eps;
 
     private Polygon? GetCurrentSketchPolygon()
     {
@@ -222,7 +243,7 @@ public partial class MainWindow : Window
         return polygon;
     }
 
-    private void EndEdit()
+    private void CancelEdit()
     {
         // Set edit mode to None
         if (editManager != null)
@@ -241,18 +262,20 @@ public partial class MainWindow : Window
                 MapControl.Map.Widgets.Add(widget);
             }
 
-            // editingWidget?.Layer?.Clear();
+            editingWidget?.Layer?.Clear();
             MapControl.Map.Refresh();
             editingWidget = null;
         }
 
         // Disable stop button since edit mode is now inactive
-        StopEditButton.IsEnabled = false;
+        CancelEditButton.IsEnabled = false;
         StartEditButton.IsEnabled = true;
+        EditStatus = EditStatus.None;
     }
 
     private void StartEdit_Click(object sender, RoutedEventArgs e)
     {
+        EditStatus = EditStatus.Editing;
         // Enter edit mode
         if (editingWidget == null)
         {
@@ -267,98 +290,109 @@ public partial class MainWindow : Window
             SetEditStyles();
 
             // Enable stop button since edit mode is now active
-            StopEditButton.IsEnabled = true;
+            CancelEditButton.IsEnabled = true;
             StartEditButton.IsEnabled = false;
         }
     }
 
-    private bool hasError = false;
+    private EditStatus editStatus = EditStatus.None;
 
-    public bool HasError
+    private EditStatus EditStatus
     {
-        get => hasError;
-        private set
+        get => editStatus;
+        set
         {
-            if (hasError == value) return;
-            hasError = value;
+            editStatus = value;
+            if (editStatus == EditStatus.Finished)
+            {
+                SaveEditButton.IsEnabled = true;
+            }
+            else
+            {
+                SaveEditButton.IsEnabled = false;
+            }
+            
             SetEditStyles();
         }
     }
 
     private void SetEditStyles()
     {
-        if (editingWidget?.Layer == null || 
-            editLayer==null)
+        if (editingWidget?.Layer == null ||
+            editLayer == null)
         {
             return;
         }
 
-        StyleCollection styleCollection = new StyleCollection { };
-        if (!hasError)
+        StyleCollection styleCollection = new StyleCollection();
+        styleCollection.Styles.Add(this.vertexStyle);
+
+        switch (EditStatus)
         {
-            styleCollection.Styles.Add(this.drawingVectorStyle);
-            styleCollection.Styles.Add(this.vertexStyle);
+            case EditStatus.Error:
+                styleCollection.Styles.Add(this.errorVectorStyle);
+                break;
+            case EditStatus.Accepted:
+                styleCollection.Styles.Add(this.acceptedVectorStyle);
+                break;
+            case EditStatus.Finished:
+                styleCollection.Styles.Add(this.finishedVectorStyle);
+                break;
+            case EditStatus.Editing:
+            case EditStatus.None:
+            default:
+                styleCollection.Styles.Add(this.editingVectorStyle);
+                break;
         }
-        else
-        {
-            styleCollection.Styles.Add(this.errorVectorStyle);
-            styleCollection.Styles.Add(this.vertexStyle);
-        }
-        
+
         this.editLayer.Style = styleCollection;
         MapControl?.Map.Refresh();
     }
 
-    private void StopEditButton_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-    {
-        e.Handled = true;
-    }
-
     private void StopEdit_Click(object sender, RoutedEventArgs e)
     {
-        // Mark event as handled to prevent it from reaching the map
         e.Handled = true;
 
-        EndEdit();
+        CancelEdit();
     }
 
-    private static bool CrossingLines(double l1Lat1, double l1Long1, double l1Lat2, double l1Long2, double l2Lat1,
-        double l2Long1, double l2Lat2, double l2Long2)
+    private void SaveEditButton_OnClick(object sender, RoutedEventArgs e)
     {
-        //Lars H:
-        double latInt = 0.0;
-        double longInt = 0.0;
-        double A1 = l1Long2 - l1Long1; //y2 - y1;
-        double B1 = l1Lat1 - l1Lat2; //x1 - x2;
-        double C1 = A1 * l1Lat1 + B1 * l1Long1; //A * x1 + B * y1;
-
-        double A2 = l2Long2 - l2Long1; //y2 - y1;
-        double B2 = l2Lat1 - l2Lat2; //x1 - x2;
-        double C2 = A2 * l2Lat1 + B2 * l2Long1; //A * x1 + B * y1;
-        double det = A1 * B2 - A2 * B1;
-        if (det == 0)
+        if (editManager != null)
         {
-            return false;
+            editManager.EditMode = Mapsui.Nts.Editing.EditMode.None;
+        }
+        
+        // Copy active polygon to polygon layer
+        // Maybe check if it is valid?
+        
+        var features = editingWidget?.Layer?.GetFeatures();
+        var geometryFeature = features?.OfType<GeometryFeature>().FirstOrDefault(); // Should be my poly, needs some error handling I guess
+
+        if (geometryFeature != null)
+        {
+            polygonLayer?.Add(geometryFeature);
+            editLayer?.Clear();
+        }
+        
+        // Remove editing widget
+        if (editingWidget != null && MapControl?.Map != null)
+        {
+            var widgets = MapControl.Map.Widgets.ToList();
+            widgets.Remove(editingWidget);
+            MapControl.Map.Widgets.Clear();
+            foreach (var widget in widgets)
+            {
+                MapControl.Map.Widgets.Add(widget);
+            }
+            
+            MapControl.Map.Refresh();
+            editingWidget = null;
         }
 
-        latInt = (B2 * C1 - B1 * C2) / det;
-        longInt = (A1 * C2 - A2 * C1) / det;
-        double lengthLine1 = (l1Lat1 - l1Lat2) * (l1Lat1 - l1Lat2) + (l1Long1 - l1Long2) * (l1Long1 - l1Long2);
-        double distTo11 = (l1Lat1 - latInt) * (l1Lat1 - latInt) + (l1Long1 - longInt) * (l1Long1 - longInt);
-        double distTo12 = (latInt - l1Lat2) * (latInt - l1Lat2) + (longInt - l1Long2) * (longInt - l1Long2);
-        if (!(distTo11 < lengthLine1 && distTo12 < lengthLine1))
-        {
-            return false;
-        }
-
-        double lengthLine2 = (l2Lat1 - l2Lat2) * (l2Lat1 - l2Lat2) + (l2Long1 - l2Long2) * (l2Long1 - l2Long2);
-        double distTo21 = (l2Lat1 - latInt) * (l2Lat1 - latInt) + (l2Long1 - longInt) * (l2Long1 - longInt);
-        double distTo22 = (latInt - l2Lat2) * (latInt - l2Lat2) + (longInt - l2Long2) * (longInt - l2Long2);
-        if (!(distTo21 < lengthLine2 && distTo22 < lengthLine2))
-        {
-            return false;
-        }
-
-        return true;
+        // Disable stop button since edit mode is now inactive
+        CancelEditButton.IsEnabled = false;
+        StartEditButton.IsEnabled = true;
+        EditStatus = EditStatus.None;
     }
 }

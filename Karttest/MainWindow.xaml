@@ -8,9 +8,9 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="1200" Width="1200">
     <Grid x:Name="MainGrid">
-        
-        <mapsui:MapControl x:Name="MapControl"/>
-        
+
+        <mapsui:MapControl x:Name="MapControl" />
+
         <Grid x:Name="UIOverlay">
             <Button x:Name="StartEditButton"
                     Content="Start edit"
@@ -20,18 +20,28 @@
                     Padding="10,5,10,5"
                     Click="StartEdit_Click"
                     IsHitTestVisible="True"
-                    Focusable="False"/>
+                    Focusable="False" />
 
-            <Button x:Name="StopEditButton"
-                    Content="Stop edit"
+            <Button x:Name="CancelEditButton"
+                    Content="Cancel edit"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Top"
                     Margin="0,50,10,0"
                     Padding="10,5,10,5"
                     Click="StopEdit_Click"
                     IsHitTestVisible="True"
-                    Focusable="False"
-                    MouseDown="StopEditButton_MouseDown"/>
+                    Focusable="False" />
+            
+            <Button x:Name="SaveEditButton"
+                    Content="Save edit"
+                    IsEnabled="False"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="0,90,10,0"
+                    Padding="10,5,10,5"
+                    IsHitTestVisible="True"
+                    Focusable="False" Click="SaveEditButton_OnClick" />
+            
         </Grid>
     </Grid>
 </Window>
