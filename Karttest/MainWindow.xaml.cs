@@ -197,12 +197,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // if (EditStatus == EditStatus.Error)
-        // {
-        //     e.Handled = true;
-        //     return;
-        // }
-
         if (editStatus == EditStatus.Accepted)
         {
             e.Handled = true;
