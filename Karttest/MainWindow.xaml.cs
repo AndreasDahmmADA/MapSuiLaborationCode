@@ -35,6 +35,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private Coordinate? deleteCandidate = null;
     private EditMode? previousEditMode;
     private Polygon? currentPolygon = null;
+    private bool isDragMode = false;
 
     private DispatcherTimer editModeTimer;
     private EditMode lastObservedEditMode = EditMode.None;
@@ -96,6 +97,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         MapControl.PreviewMouseRightButtonUp += MapControl_PreviewMouseRightUp;
         MapControl.PreviewMouseLeftButtonDown += MapControl_PreviewMouseLeftDown;
         MapControl.PreviewMouseMove += MapControl_PreviewMouseMove;
+        MapControl.PreviewMouseLeftButtonUp += MapControl_MouseLeftButtonUp;
         MapControl.PreviewKeyDown += MapControl_KeyDown;
         MapControl.PreviewKeyUp += MapControl_KeyUp;
         MapControl.Focus();
@@ -103,6 +105,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         InitializeEditModeTimer();
 
         DataContext = this;
+    }
+
+    private void MapControl_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        StopDragCordinate(sender, e);
     }
 
     public EditMode CurrentEditMode => editManager?.EditMode ?? EditMode.None;
@@ -187,7 +194,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (isCtrlHeld)
             {
                 if (editManager?.EditMode == EditMode.AddPolygon ||
-                    editManager?.EditMode == EditMode.DrawingPolygon)
+                    editManager?.EditMode == EditMode.DrawingPolygon || 
+                    editManager?.EditMode == EditMode.Modify)
                 {
                     previousEditMode = editManager.EditMode;
                     editManager.EditMode = EditMode.None;
@@ -197,15 +205,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             {
                 if (editManager != null && previousEditMode.HasValue)
                 {
-                    if (!hasDeleted)
-                    {
-                        editManager.EditMode = previousEditMode.Value;
-                    }
-                    else
-                    {
-                        editManager.EditMode = EditMode.Modify;
-                    }
-
+                    editManager.EditMode = previousEditMode.Value;
                     previousEditMode = null;
                 }
             }
@@ -274,11 +274,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void MapControl_PreviewMouseMove(object sender, MouseEventArgs e)
     {
+        DragCoordinate(sender, e);
+        
         // Maybe create this on click, so we keep in memory and do not need to recalculate every time
         Polygon? polygon = GetCurrentSketchPolygon();
 
         if (IsShiftHeld &&
-            editManager?.EditMode == EditMode.None &&
+            (editManager?.EditMode == EditMode.None || 
+             editManager?.EditMode == EditMode.Modify) &&
             polygon != null)
         {
             // Entering delete modus
@@ -298,6 +301,31 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 }
 
                 MapControl.Cursor = Cursors.Arrow;
+            }
+        }
+
+        if (IsCtrlHeld && 
+            (editManager?.EditMode == EditMode.None || 
+             editManager?.EditMode==EditMode.Modify) && 
+            polygon != null)
+        {
+            // Let's move coordinates
+            
+            var world = GetWorldPoint(e);
+            double pixelTolerance = 12.0 * MapControl.Map.Navigator.Viewport.Resolution;
+            
+            foreach (Coordinate coordinate in polygon.Coordinates)
+            {
+                bool isNearPolygon = world != null && GeometryHelpers.IsNear(coordinate, world, pixelTolerance);
+                if (isNearPolygon)
+                {
+                    MapControl.Cursor = Cursors.Hand;
+                    isDragMode = true;
+                    break;
+                }
+
+                MapControl.Cursor = Cursors.Arrow;
+                isDragMode = false;
             }
         }
 
@@ -385,10 +413,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Debug.WriteLine("Left mouse button down");
 
         if (IsShiftHeld &&
-            (editManager?.EditMode == EditMode.None || editManager?.EditMode == EditMode.Modify) &&
+            (editManager?.EditMode == EditMode.None || 
+             editManager?.EditMode == EditMode.Modify) &&
             deleteCandidate != null)
         {
             DeleteCoordinate(e);
+        }
+        
+        if(IsCtrlHeld && 
+           (editManager?.EditMode == EditMode.None || 
+            editManager?.EditMode == EditMode.Modify) && 
+           isDragMode)
+        {
+           StartDragCoordinate(e); 
         }
 
         if (editManager?.EditMode != EditMode.AddPolygon &&
@@ -420,6 +457,46 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         EditStatus = EditStatus.Finished;
     }
 
+    private bool isDragging = false;
+    private void StartDragCoordinate(MouseButtonEventArgs e)
+    {
+        editManager.EndEdit();
+        editManager.EditMode = EditMode.Modify;
+        var point = e.GetPosition(MapControl);
+        var mapInfo = MapControl.GetMapInfo(new ScreenPosition(point.X, point.Y), new[] { editLayer });
+        
+        isDragging = editManager.StartDragging(mapInfo, editManager.VertexRadius);
+        if (isDragging)
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void DragCoordinate(object sender, MouseEventArgs e)
+    {
+        if (!isDragging || e.LeftButton != MouseButtonState.Pressed) return;
+
+        var point = e.GetPosition(MapControl);
+        editManager.Dragging(new NetTopologySuite.Geometries.Point(point.X, point.Y));
+        editManager.Layer?.DataHasChanged();
+        MapControl.Refresh();
+    }
+
+    private void StopDragCordinate(object sender, MouseButtonEventArgs e)
+    {
+        if (!isDragging)
+        {
+            return;
+        }
+
+        editManager.StopDragging();
+        isDragging = false;
+        isDragMode = false;
+
+        editManager.Layer?.DataHasChanged();
+        MapControl.Refresh();
+    }
+    
     private void DeleteCoordinate(MouseButtonEventArgs e)
     {
         Point worldPoint = e.GetPosition(MapControl);
