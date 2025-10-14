@@ -1,25 +1,88 @@
-/Karttest/obj/Debug/net8.0-windows/Karttest.sourcelink.json
-/Karttest/obj/Debug/net8.0-windows/Karttest_3h3hahko_wpftmp.AssemblyInfo.cs
-/Karttest/obj/Debug/net8.0-windows/Karttest_3h3hahko_wpftmp.AssemblyInfoInputs.cache
-/Karttest/obj/Debug/net8.0-windows/Karttest_3h3hahko_wpftmp.assets.cache
-/Karttest/obj/Debug/net8.0-windows/Karttest_3h3hahko_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
-/Karttest/obj/Debug/net8.0-windows/Karttest_3h3hahko_wpftmp.GlobalUsings.g.cs
-/Karttest/obj/Debug/net8.0-windows/Karttest_3h3hahko_wpftmp.sourcelink.json
-/Karttest/obj/Debug/net8.0-windows/Karttest_eourskvp_wpftmp.AssemblyInfo.cs
-/Karttest/obj/Debug/net8.0-windows/Karttest_eourskvp_wpftmp.AssemblyInfoInputs.cache
-/Karttest/obj/Debug/net8.0-windows/Karttest_eourskvp_wpftmp.assets.cache
-/Karttest/obj/Debug/net8.0-windows/Karttest_eourskvp_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
-/Karttest/obj/Debug/net8.0-windows/Karttest_eourskvp_wpftmp.GlobalUsings.g.cs
-/Karttest/obj/Debug/net8.0-windows/Karttest_eourskvp_wpftmp.sourcelink.json
-/Karttest/obj/Debug/net8.0-windows/Karttest_fcfmn5kf_wpftmp.AssemblyInfo.cs
-/Karttest/obj/Debug/net8.0-windows/Karttest_fcfmn5kf_wpftmp.AssemblyInfoInputs.cache
-/Karttest/obj/Debug/net8.0-windows/Karttest_fcfmn5kf_wpftmp.assets.cache
-/Karttest/obj/Debug/net8.0-windows/Karttest_fcfmn5kf_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
-/Karttest/obj/Debug/net8.0-windows/Karttest_fcfmn5kf_wpftmp.GlobalUsings.g.cs
-/Karttest/obj/Debug/net8.0-windows/Karttest_fcfmn5kf_wpftmp.sourcelink.json
-/Karttest/obj/Debug/net8.0-windows/Karttest_tuumfaoi_wpftmp.AssemblyInfo.cs
-/Karttest/obj/Debug/net8.0-windows/Karttest_tuumfaoi_wpftmp.AssemblyInfoInputs.cache
-/Karttest/obj/Debug/net8.0-windows/Karttest_tuumfaoi_wpftmp.assets.cache
-/Karttest/obj/Debug/net8.0-windows/Karttest_tuumfaoi_wpftmp.GeneratedMSBuildEditorConfig.editorconfig
-/Karttest/obj/Debug/net8.0-windows/Karttest_tuumfaoi_wpftmp.GlobalUsings.g.cs
-/Karttest/obj/Debug/net8.0-windows/Karttest_tuumfaoi_wpftmp.sourcelink.json
+# ---------- OS / General ----------
+# Windows & macOS cruft
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+*.tmp
+*.bak
+
+# Logs
+*.log
+logs/
+Log/
+Logs/
+
+# ---------- IDEs ----------
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider / IntelliJ
+.idea/
+*.iml
+shelf/
+httpRequests/
+# Data source configs
+dataSources/
+dataSources.local.xml
+
+# VS Code (optional; keep if you use it)
+.vscode/
+
+# ---------- .NET / Build Artifacts ----------
+# Binaries & intermediates
+[Bb]in/
+[Oo]bj/
+[Bb]uild/
+artifacts/
+
+# Debugging
+*.pdb
+*.mdb
+
+# MSBuild caches
+*.cache
+*.obj
+
+# WPF / XAML generated
+*.g.cs
+*.g.i.cs
+*.g.vb
+*.baml
+
+# ClickOnce / publish output
+app.publish/
+publish/
+
+# ---------- NuGet ----------
+# Local packages (if you pack/publish locally, keep ignored)
+*.nupkg
+*.snupkg
+# Classic packages folder (SDK projects typically restore to global cache)
+packages/
+# NuGet v3 cache is in %userprofile%/.nuget; no need to ignore here.
+
+# ---------- Testing / Coverage ----------
+TestResult*/
+[Test]Results*/
+*.coverage
+*.coveragexml
+coverage/
+coverage-*/ 
+
+# ---------- JetBrains / ReSharper / Profilers ----------
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+*.dotCover
+*.dotTrace
+*.dotMemory
+
+# ---------- Configs that are machine-local ----------
+# Keep shared .editorconfig, but ignore user/machine overrides
+*.local.json
+*.user.json
