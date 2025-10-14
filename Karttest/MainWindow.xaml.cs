@@ -379,11 +379,6 @@ public partial class MainWindow : Window
 
     private void SaveEditButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (editManager != null)
-        {
-            editManager.EditMode = Mapsui.Nts.Editing.EditMode.None;
-        }
-        
         var geometryFeature = GetFeature();
 
         if (geometryFeature != null)
@@ -394,7 +389,6 @@ public partial class MainWindow : Window
         
         RemoveEditingWidget();
 
-        // Disable stop button since edit mode is now inactive
         CancelEditButton.IsEnabled = false;
         StartEditButton.IsEnabled = true;
         EditStatus = EditStatus.None;
