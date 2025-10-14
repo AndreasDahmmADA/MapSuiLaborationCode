@@ -31,14 +31,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private Mapsui.Nts.Widgets.EditingWidget? editingWidget;
     private Mapsui.Layers.WritableLayer? editLayer;
     private Mapsui.Layers.WritableLayer? polygonLayer;
-    
+
     private Coordinate? deleteCandidate = null;
     private EditMode? previousEditMode;
     private Polygon? currentPolygon = null;
-    
+
     private DispatcherTimer editModeTimer;
     private EditMode lastObservedEditMode = EditMode.None;
-    
+
     private readonly VectorStyle errorVectorStyle = new VectorStyle
     {
         Fill = new Brush(Color.FromRgba(236, 29, 28, 200)),
@@ -99,12 +99,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         MapControl.PreviewKeyDown += MapControl_KeyDown;
         MapControl.PreviewKeyUp += MapControl_KeyUp;
         MapControl.Focus();
-        
+
         InitializeEditModeTimer();
 
         DataContext = this;
     }
-    
+
     public EditMode CurrentEditMode => editManager?.EditMode ?? EditMode.None;
 
     private void InitializeEditModeTimer()
@@ -117,7 +117,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         editModeTimer.Start();
     }
-    
+
     private void ProbeEditMode()
     {
         var mode = editManager?.EditMode ?? EditMode.None;
@@ -135,6 +135,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public EditMode EditMode => editManager?.EditMode ?? EditMode.None;
 
     private bool isShiftHeld;
+
     public bool IsShiftHeld
     {
         get => isShiftHeld;
@@ -158,13 +159,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 {
                     if (!hasDeleted)
                     {
-                        editManager.EditMode = previousEditMode.Value;    
+                        editManager.EditMode = previousEditMode.Value;
                     }
                     else
                     {
-                        editManager.EditMode= EditMode.Modify;
+                        editManager.EditMode = EditMode.Modify;
                     }
-                    
+
                     previousEditMode = null;
                 }
             }
@@ -172,9 +173,54 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             OnPropertyChanged(nameof(IsShiftHeld));
         }
     }
-    
+
+    private bool isCtrlHeld;
+
+    public bool IsCtrlHeld
+    {
+        get => isCtrlHeld;
+        private set
+        {
+            if (isCtrlHeld == value) return;
+            isCtrlHeld = value;
+
+            if (isCtrlHeld)
+            {
+                if (editManager?.EditMode == EditMode.AddPolygon ||
+                    editManager?.EditMode == EditMode.DrawingPolygon)
+                {
+                    previousEditMode = editManager.EditMode;
+                    editManager.EditMode = EditMode.None;
+                }
+            }
+            else
+            {
+                if (editManager != null && previousEditMode.HasValue)
+                {
+                    if (!hasDeleted)
+                    {
+                        editManager.EditMode = previousEditMode.Value;
+                    }
+                    else
+                    {
+                        editManager.EditMode = EditMode.Modify;
+                    }
+
+                    previousEditMode = null;
+                }
+            }
+
+            OnPropertyChanged(nameof(isCtrlHeld));
+        }
+    }
+
     private void MapControl_KeyUp(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+        {
+            IsCtrlHeld = false;
+        }
+
         if (e.Key == Key.LeftShift || e.Key == Key.RightShift)
         {
             IsShiftHeld = false;
@@ -183,9 +229,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void MapControl_KeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+        {
+            if (!IsShiftHeld)
+            {
+                IsCtrlHeld = true;
+            }
+        }
+
         if (e.Key == Key.LeftShift || e.Key == Key.RightShift)
         {
-            IsShiftHeld = true;
+            if (!IsCtrlHeld)
+            {
+                IsShiftHeld = true;
+            }
         }
     }
 
@@ -197,7 +254,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         };
         MapControl.Map?.Layers.Add(editLayer);
     }
-    
+
     private void DoneEditButton_OnClick(object sender, RoutedEventArgs e)
     {
         throw new NotImplementedException();
@@ -227,7 +284,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             // Entering delete modus
             var world = GetWorldPoint(e);
             double pixelTolerance = 12.0 * MapControl.Map.Navigator.Viewport.Resolution;
-            
+
             // Lets find what polygon we are near to
             deleteCandidate = null;
             foreach (Coordinate coordinate in polygon.Coordinates)
@@ -250,7 +307,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        if (editManager?.EditMode != EditMode.DrawingPolygon && 
+        if (editManager?.EditMode != EditMode.DrawingPolygon &&
             editManager?.EditMode != EditMode.Modify)
         {
             return;
@@ -333,9 +390,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             DeleteCoordinate(e);
         }
-        
+
         if (editManager?.EditMode != EditMode.AddPolygon &&
-            editManager?.EditMode != EditMode.DrawingPolygon && 
+            editManager?.EditMode != EditMode.DrawingPolygon &&
             EditMode != EditMode.Modify)
         {
             return;
@@ -357,7 +414,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         var geometryFeature = GetFeature();
         var polygon = geometryFeature?.Geometry as Polygon;
-            
+
         editManager?.AddVertex(polygon?.Coordinates[0]); // Close by adding first coordinate again
         editManager.EditMode = EditMode.None;
         EditStatus = EditStatus.Finished;
@@ -367,19 +424,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         Point worldPoint = e.GetPosition(MapControl);
         MapInfo? mapInfo = MapControl.GetMapInfo(new ScreenPosition(worldPoint.X, worldPoint.Y), new[] { editLayer });
-        
+
         editManager.EndEdit();
         editManager.EditMode = EditMode.Modify;
-        
+
         editManager.TryDeleteCoordinate(mapInfo, editManager.VertexRadius);
         editManager.Layer?.DataHasChanged();
         MapControl.Map.Refresh();
-        
+
         editManager.EndEdit();
         hasDeleted = true;
         deleteCandidate = null;
     }
-    
+
     private GeometryFeature? GetFeature()
     {
         var features = editingWidget?.Layer?.GetFeatures();
@@ -489,6 +546,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     private EditStatus editStatus = EditStatus.None;
+
     private EditStatus EditStatus
     {
         get => editStatus;
@@ -581,7 +639,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void OnPropertyChanged(string name)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-    
+
     protected override void OnClosed(EventArgs e)
     {
         editModeTimer.Stop();

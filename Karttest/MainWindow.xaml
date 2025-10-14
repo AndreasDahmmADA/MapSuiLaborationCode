@@ -79,6 +79,20 @@
         
         <Border
             HorizontalAlignment="Left"
+            VerticalAlignment="Bottom"
+            Margin="8"
+            Padding="4,2"
+            CornerRadius="6"
+            Background="#80000000"
+            Visibility="{Binding IsCtrlHeld, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="CTRL"
+                       Foreground="White"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+        </Border>
+        
+        <Border
+            HorizontalAlignment="Left"
             VerticalAlignment="Top"
             Margin="8"
             Padding="4,2"
