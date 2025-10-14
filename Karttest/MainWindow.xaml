@@ -6,10 +6,16 @@
         xmlns:local="clr-namespace:Karttest"
         xmlns:mapsui="clr-namespace:Mapsui.UI.Wpf;assembly=Mapsui.UI.Wpf"
         mc:Ignorable="d"
-        Title="MainWindow" Height="1200" Width="1200">
+        Title="MainWindow" Height="1200" Width="1200" d:DataContext="{d:DesignInstance }">
+   
+    <Window.Resources>
+         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+    </Window.Resources>
+    
     <Grid x:Name="MainGrid">
 
-        <mapsui:MapControl x:Name="MapControl" />
+        <mapsui:MapControl x:Name="MapControl"
+                           Focusable="True" />
 
         <Grid x:Name="UIOverlay">
             <Button x:Name="StartEditButton"
@@ -22,26 +28,53 @@
                     IsHitTestVisible="True"
                     Focusable="False" />
 
-            <Button x:Name="CancelEditButton"
-                    Content="Cancel edit"
+            <Button x:Name="DoneEditButton"
+                    Content="Done edit"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Top"
                     Margin="0,50,10,0"
                     Padding="10,5,10,5"
+                    IsHitTestVisible="True"
+                    IsEnabled="False"
+                    Focusable="False" />
+
+            <Button x:Name="CancelEditButton"
+                    Content="Cancel edit"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    IsEnabled="False"
+                    Margin="0,90,10,0"
+                    Padding="10,5,10,5"
                     Click="StopEdit_Click"
                     IsHitTestVisible="True"
                     Focusable="False" />
-            
+
             <Button x:Name="SaveEditButton"
                     Content="Save edit"
                     IsEnabled="False"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Top"
-                    Margin="0,90,10,0"
+                    Margin="0,130,10,0"
                     Padding="10,5,10,5"
                     IsHitTestVisible="True"
-                    Focusable="False" Click="SaveEditButton_OnClick" />
-            
+                    Focusable="False"
+                    Click="SaveEditButton_OnClick" />
+
         </Grid>
+
+        <Border
+            HorizontalAlignment="Left"
+            VerticalAlignment="Bottom"
+            Margin="8"
+            Padding="4,2"
+            CornerRadius="6"
+            Background="#80000000"
+            Visibility="{Binding IsShiftHeld, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="SHIFT"
+                       Foreground="White"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+        </Border>
+
     </Grid>
 </Window>

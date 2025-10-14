@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
 using Mapsui;
@@ -21,7 +23,7 @@ public enum EditStatus
     Editing
 }
 
-public partial class MainWindow : Window
+public partial class MainWindow : Window, INotifyPropertyChanged
 {
     private EditManager? editManager;
     private Mapsui.Nts.Widgets.EditingWidget? editingWidget;
@@ -85,6 +87,39 @@ public partial class MainWindow : Window
         MapControl.PreviewMouseRightButtonUp += MapControl_PreviewMouseRightUp;
         MapControl.PreviewMouseLeftButtonDown += MapControl_PreviewMouseLeftDown;
         MapControl.PreviewMouseMove += MapControl_PreviewMouseMove;
+        MapControl.PreviewKeyDown += MapControl_KeyDown;
+        MapControl.PreviewKeyUp += MapControl_KeyUp;
+        MapControl.Focus();
+        
+        DataContext = this;
+    }
+
+    private bool isShiftHeld;
+    public bool IsShiftHeld
+    {
+        get => isShiftHeld;
+        private set
+        {
+            if(isShiftHeld==value) return;
+            isShiftHeld = value;
+            OnPropertyChanged(nameof(IsShiftHeld));
+        }
+    }
+
+    private void MapControl_KeyUp(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.LeftShift || e.Key == Key.RightShift)
+        {
+            IsShiftHeld = false;
+        }
+    }
+    
+    private void MapControl_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.LeftShift || e.Key == Key.RightShift)
+        {
+            IsShiftHeld = true;
+        }
     }
 
     private void InitializeEditLayer()
@@ -393,4 +428,16 @@ public partial class MainWindow : Window
         StartEditButton.IsEnabled = true;
         EditStatus = EditStatus.None;
     }
+    
+    protected bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+        field = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+    
+    public event PropertyChangedEventHandler PropertyChanged;
+    private void OnPropertyChanged(string name)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
