@@ -6,7 +6,6 @@ using Mapsui.Extensions;
 using Mapsui.Manipulations;
 using Mapsui.Nts;
 using Mapsui.Nts.Editing;
-using Mapsui.Nts.Extensions;
 using Mapsui.Styles;
 using NetTopologySuite.Geometries;
 using Point = System.Windows.Point;
@@ -26,8 +25,8 @@ public partial class MainWindow : Window
 {
     private EditManager? editManager;
     private Mapsui.Nts.Widgets.EditingWidget? editingWidget;
-    private readonly Mapsui.Layers.WritableLayer? editLayer;
-    private readonly Mapsui.Layers.WritableLayer? polygonLayer;
+    private Mapsui.Layers.WritableLayer? editLayer;
+    private Mapsui.Layers.WritableLayer? polygonLayer;
 
     private readonly VectorStyle errorVectorStyle = new VectorStyle
     {
@@ -72,18 +71,9 @@ public partial class MainWindow : Window
         MapControl.Map ??= new Mapsui.Map();
         MapControl.Map?.Layers.Add(Mapsui.Tiling.OpenStreetMap.CreateTileLayer());
         
-        editLayer = new Mapsui.Layers.WritableLayer
-        {
-            Name = "EditLayer"
-        };
-        MapControl.Map?.Layers.Add(editLayer);
+        InitializeEditLayer();
+        InitializePolygonLayer();
 
-        polygonLayer = new Mapsui.Layers.WritableLayer
-        {
-            Name = "PolygonLayer"
-        };
-        MapControl.Map?.Layers.Add(polygonLayer);
-        
         (double x, double y) = Mapsui.Projections.SphericalMercator.FromLonLat(longitude, latitude);
         var sphericalMercatorCoordinate = new Mapsui.MPoint(x, y);
         
@@ -97,8 +87,35 @@ public partial class MainWindow : Window
         MapControl.PreviewMouseMove += MapControl_PreviewMouseMove;
     }
 
+    private void InitializeEditLayer()
+    {
+        editLayer = new Mapsui.Layers.WritableLayer
+        {
+            Name = "EditLayer"
+        };
+        MapControl.Map?.Layers.Add(editLayer);
+    }
+
+    private void InitializePolygonLayer()
+    {
+        StyleCollection polygonStyleCollection = new StyleCollection();
+        polygonStyleCollection.Styles.Add(finishedVectorStyle);
+        polygonLayer = new Mapsui.Layers.WritableLayer
+        {
+            Name = "PolygonLayer",
+            Style = polygonStyleCollection,
+        };
+        MapControl.Map?.Layers.Add(polygonLayer);
+    }
+
     private void MapControl_PreviewMouseMove(object sender, MouseEventArgs e)
     {
+        if (editManager?.EditMode == EditMode.None)
+        {
+            e.Handled = true;
+            return;
+        }
+        
         if (editManager?.EditMode != EditMode.DrawingPolygon)
         {
             return;
@@ -122,8 +139,8 @@ public partial class MainWindow : Window
             MapInfo? mapInfo = MapControl.GetMapInfo(new ScreenPosition(worldPoint.X, worldPoint.Y), [editLayer]);
             MPoint? world = mapInfo?.WorldPosition;
             double pixelTolerance = 20.0 * MapControl.Map.Navigator.Viewport.Resolution;
-            bool isClosingClick = world != null && GeometryHelpers.IsNear(polygon.Coordinates[0], world, pixelTolerance);
-            if (isClosingClick)
+            bool isNearFirstPolygon = world != null && GeometryHelpers.IsNear(polygon.Coordinates[0], world, pixelTolerance);
+            if (isNearFirstPolygon)
             {
                 EditStatus = EditStatus.Accepted;    
             }
@@ -168,31 +185,43 @@ public partial class MainWindow : Window
     private void MapControl_PreviewMouseLeftDown(object sender, MouseButtonEventArgs e)
     {
         Debug.WriteLine("Left mouse button down");
-
-        if (editStatus == EditStatus.Accepted)
-        {
-            e.Handled = true;
-            
-            Point worldPoint = e.GetPosition(MapControl);
-            MapInfo? mapInfo = MapControl.GetMapInfo(new ScreenPosition(worldPoint.X, worldPoint.Y), [editLayer]);
-            MPoint? coordinatePoint = mapInfo?.WorldPosition;
-
-            this.editManager?.AddVertex(coordinatePoint?.ToCoordinate());
-            this.editManager.EditMode = EditMode.None;
-            EditStatus = EditStatus.Finished;
-            return;
-        }
-
+        
         if (editManager?.EditMode != EditMode.AddPolygon && 
             editManager?.EditMode != EditMode.DrawingPolygon)
         {
             return;
         }
 
-        if (EditStatus == EditStatus.Error)
+        if (editStatus == EditStatus.Finished)
+        {
+            return;
+        }
+
+        // if (EditStatus == EditStatus.Error)
+        // {
+        //     e.Handled = true;
+        //     return;
+        // }
+
+        if (editStatus == EditStatus.Accepted)
         {
             e.Handled = true;
+            
+            var geometryFeature = GetFeature();
+            var polygon = geometryFeature?.Geometry as Polygon;
+            
+            this.editManager?.AddVertex(polygon?.Coordinates[0]); // Close by adding first coordinate again
+            this.editManager.EditMode = EditMode.None;
+            EditStatus = EditStatus.Finished;
+            return;
         }
+    }
+
+    private GeometryFeature? GetFeature()
+    {
+        var features = editingWidget?.Layer?.GetFeatures();
+        var geometryFeature = features?.OfType<GeometryFeature>().FirstOrDefault(); // Should be my poly, needs some error handling I guess
+        return geometryFeature;
     }
 
     private void MapControl_PreviewMouseRightUp(object sender, MouseButtonEventArgs e)
@@ -236,22 +265,24 @@ public partial class MainWindow : Window
 
     private Polygon? GetCurrentSketchPolygon()
     {
-        var features = editingWidget?.Layer?.GetFeatures();
-        var gf = features?.OfType<GeometryFeature>().FirstOrDefault();
-        Polygon? polygon = gf?.Geometry as Polygon;
+        var geometryFeature = GetFeature();
+        Polygon? polygon = geometryFeature?.Geometry as Polygon;
 
         return polygon;
     }
 
     private void CancelEdit()
     {
-        // Set edit mode to None
-        if (editManager != null)
-        {
-            editManager.EditMode = Mapsui.Nts.Editing.EditMode.None;
-        }
+        RemoveEditingWidget();
 
-        // Remove editing widget
+        // Disable stop button since edit mode is now inactive
+        CancelEditButton.IsEnabled = false;
+        StartEditButton.IsEnabled = true;
+        EditStatus = EditStatus.None;
+    }
+
+    private void RemoveEditingWidget()
+    {
         if (editingWidget != null && MapControl?.Map != null)
         {
             var widgets = MapControl.Map.Widgets.ToList();
@@ -263,14 +294,10 @@ public partial class MainWindow : Window
             }
 
             editingWidget?.Layer?.Clear();
-            MapControl.Map.Refresh();
             editingWidget = null;
+            editManager = null;
+            MapControl.Map.Refresh();
         }
-
-        // Disable stop button since edit mode is now inactive
-        CancelEditButton.IsEnabled = false;
-        StartEditButton.IsEnabled = true;
-        EditStatus = EditStatus.None;
     }
 
     private void StartEdit_Click(object sender, RoutedEventArgs e)
@@ -363,11 +390,7 @@ public partial class MainWindow : Window
             editManager.EditMode = Mapsui.Nts.Editing.EditMode.None;
         }
         
-        // Copy active polygon to polygon layer
-        // Maybe check if it is valid?
-        
-        var features = editingWidget?.Layer?.GetFeatures();
-        var geometryFeature = features?.OfType<GeometryFeature>().FirstOrDefault(); // Should be my poly, needs some error handling I guess
+        var geometryFeature = GetFeature();
 
         if (geometryFeature != null)
         {
@@ -375,20 +398,7 @@ public partial class MainWindow : Window
             editLayer?.Clear();
         }
         
-        // Remove editing widget
-        if (editingWidget != null && MapControl?.Map != null)
-        {
-            var widgets = MapControl.Map.Widgets.ToList();
-            widgets.Remove(editingWidget);
-            MapControl.Map.Widgets.Clear();
-            foreach (var widget in widgets)
-            {
-                MapControl.Map.Widgets.Add(widget);
-            }
-            
-            MapControl.Map.Refresh();
-            editingWidget = null;
-        }
+        RemoveEditingWidget();
 
         // Disable stop button since edit mode is now inactive
         CancelEditButton.IsEnabled = false;
