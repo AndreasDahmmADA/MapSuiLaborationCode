@@ -86,3 +86,5 @@ _ReSharper*/
 # Keep shared .editorconfig, but ignore user/machine overrides
 *.local.json
 *.user.json
+
+**/AssemblyInfo.cs
