@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:Karttest"
         xmlns:mapsui="clr-namespace:Mapsui.UI.Wpf;assembly=Mapsui.UI.Wpf"
         mc:Ignorable="d"
-        Title="MainWindow" Height="1200" Width="1200" d:DataContext="{d:DesignInstance }">
+        Title="MainWindow" Height="900" Width="900" d:DataContext="{d:DesignInstance }">
    
     <Window.Resources>
          <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
