@@ -282,23 +282,26 @@ public partial class MainWindow : INotifyPropertyChanged
              editManager?.EditMode == EditMode.Modify) &&
             polygon != null)
         {
-            // Entering delete modus
             var world = GetWorldPoint(e);
             double pixelTolerance = 12.0 * MapControl.Map.Navigator.Viewport.Resolution;
-
-            // Lets find what polygon we are near to
+            
             deleteCandidate = null;
+            int coordinateIndex = 0;
             foreach (Coordinate coordinate in polygon.Coordinates)
             {
-                bool isNearPolygon = world != null && GeometryHelpers.IsNear(coordinate, world, pixelTolerance);
+                bool isHoverVertex = coordinateIndex == polygon.Coordinates.Length - 2;
+                bool isNearPolygon = !isHoverVertex &&
+                                     world != null && 
+                                     GeometryHelpers.IsNear(coordinate, world, pixelTolerance);
                 if (isNearPolygon)
                 {
                     MapControl.Cursor = Cursors.Cross;
                     deleteCandidate = coordinate;
                     break;
                 }
-
+                
                 MapControl.Cursor = Cursors.Arrow;
+                coordinateIndex++;
             }
         }
 
