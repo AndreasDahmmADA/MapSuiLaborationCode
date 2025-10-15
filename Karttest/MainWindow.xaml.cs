@@ -154,7 +154,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (isShiftHeld)
             {
                 if (editManager?.EditMode == EditMode.AddPolygon ||
-                    editManager?.EditMode == EditMode.DrawingPolygon)
+                    editManager?.EditMode == EditMode.DrawingPolygon ||
+                    editManager?.EditMode == EditMode.Modify)
                 {
                     previousEditMode = editManager.EditMode;
                     editManager.EditMode = EditMode.None;
@@ -170,10 +171,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     }
                     else
                     {
+                        previousEditMode = editManager.EditMode;
                         editManager.EditMode = EditMode.Modify;
                     }
-
-                    previousEditMode = null;
                 }
             }
 
@@ -506,12 +506,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         editManager.EditMode = EditMode.Modify;
 
         editManager.TryDeleteCoordinate(mapInfo, editManager.VertexRadius);
-        editManager.Layer?.DataHasChanged();
-        MapControl.Map.Refresh();
 
         editManager.EndEdit();
+        editManager.Layer?.DataHasChanged();
+        MapControl.Map.Refresh();
+        
         hasDeleted = true;
-        deleteCandidate = null;
     }
 
     private GeometryFeature? GetFeature()
