@@ -88,3 +88,4 @@ _ReSharper*/
 *.user.json
 
 **/AssemblyInfo.cs
+/Karttest/obj/
