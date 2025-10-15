@@ -404,7 +404,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return null;
 
         var ring = new LinearRing(ringCoords.ToArray());
-        if (!ring.IsValid) return null; // invalid ring shape
+        if (!ring.IsValid)
+        {
+            return null;
+        }
+        
         return new Polygon(ring);
     }
 
@@ -603,23 +607,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         hasDeleted = false;
         EditStatus = EditStatus.Editing;
-        // Enter edit mode
-        if (editingWidget == null)
+
+        if (editingWidget != null)
         {
-            this.editManager = new EditManager
-            {
-                Layer = editLayer,
-                EditMode = EditMode.AddPolygon
-            };
-
-            editingWidget = new Mapsui.Nts.Widgets.EditingWidget(editManager);
-            MapControl?.Map?.Widgets.Add(editingWidget);
-            SetEditStyles();
-
-            // Enable stop button since edit mode is now active
-            CancelEditButton.IsEnabled = true;
-            StartEditButton.IsEnabled = false;
+            return;
         }
+        
+        this.editManager = new EditManager
+        {
+            Layer = editLayer,
+            EditMode = EditMode.AddPolygon
+        };
+
+        editingWidget = new Mapsui.Nts.Widgets.EditingWidget(editManager);
+        MapControl?.Map?.Widgets.Add(editingWidget);
+        SetEditStyles();
+            
+        CancelEditButton.IsEnabled = true;
+        StartEditButton.IsEnabled = false;
     }
 
     private EditStatus editStatus = EditStatus.None;
@@ -708,11 +713,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;
-        OnPropertyChanged(propertyName);
+        if (propertyName != null)
+        {
+            OnPropertyChanged(propertyName);
+        }
+        
         return true;
     }
 
-    public event PropertyChangedEventHandler PropertyChanged;
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     private void OnPropertyChanged(string name)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
