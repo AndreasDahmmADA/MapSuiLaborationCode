@@ -310,9 +310,7 @@ public partial class MainWindow : INotifyPropertyChanged
              editManager?.EditMode==EditMode.Modify) && 
             polygon != null)
         {
-            // Let's move coordinates
-            
-            var world = GetWorldPoint(e);
+            MPoint world = GetWorldPoint(e);
             double pixelTolerance = 12.0 * MapControl.Map.Navigator.Viewport.Resolution;
             
             foreach (Coordinate coordinate in polygon.Coordinates)
@@ -579,8 +577,7 @@ public partial class MainWindow : INotifyPropertyChanged
     private void CancelEdit()
     {
         RemoveEditingWidget();
-
-        // Disable stop button since edit mode is now inactive
+        
         CancelEditButton.IsEnabled = false;
         StartEditButton.IsEnabled = true;
         EditStatus = EditStatus.None;
