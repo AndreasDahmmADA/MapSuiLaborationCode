@@ -280,7 +280,8 @@ public partial class MainWindow : INotifyPropertyChanged
         if (IsShiftHeld &&
             (editManager?.EditMode == EditMode.None || 
              editManager?.EditMode == EditMode.Modify) &&
-            polygon != null)
+            polygon != null &&
+            polygon.Coordinates.Length > 5)
         {
             var world = GetWorldPoint(e);
             double pixelTolerance = 12.0 * MapControl.Map.Navigator.Viewport.Resolution;
@@ -449,6 +450,14 @@ public partial class MainWindow : INotifyPropertyChanged
         EditStatus = EditStatus.Finished;
     }
 
+    private bool CanDeleteCoordinate()
+    {
+        // Hover vertex cant be deleted
+        // The polygon must have four or more vertices
+        
+        return false;
+    }
+
     private bool isDragging;
     private void StartDragCoordinate(MouseButtonEventArgs e)
     {
@@ -516,6 +525,7 @@ public partial class MainWindow : INotifyPropertyChanged
         MapControl.Map.Refresh();
         
         hasDeleted = true;
+        MapControl.Cursor = Cursors.Arrow;
     }
 
     private GeometryFeature? GetFeature()
