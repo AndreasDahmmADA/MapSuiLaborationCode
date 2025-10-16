@@ -98,7 +98,20 @@
             Padding="4,2"
             CornerRadius="6"
             Background="#80000000">
-            <TextBlock Text="{Binding CurrentEditMode, StringFormat=Edit Mode: {0}}"
+            <TextBlock Text="{Binding CurrentEditMode, StringFormat=MapSui Edit Mode: {0}}"
+                       Foreground="White"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+        </Border>
+        
+        <Border
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            Margin="8,32"
+            Padding="4,2"
+            CornerRadius="6"
+            Background="#80000000">
+            <TextBlock Text="{Binding CurrentEditState, StringFormat=Edit State: {0}}"
                        Foreground="White"
                        FontSize="11"
                        FontWeight="SemiBold" />

@@ -15,7 +15,7 @@ using Point = System.Windows.Point;
 
 namespace Karttest;
 
-public enum EditStatus
+public enum EditState
 {
     None,
     Error,
@@ -23,6 +23,7 @@ public enum EditStatus
     Finished,
     Editing,
     Deleting,
+    Dragging,
 }
 
 public partial class MainWindow : INotifyPropertyChanged
@@ -117,13 +118,13 @@ public partial class MainWindow : INotifyPropertyChanged
         editModeTimer = new DispatcherTimer(
             TimeSpan.FromMilliseconds(150),
             DispatcherPriority.Background,
-            (_, _) => ProbeEditMode(),
+            (_, _) => PollEditMode(),
             Dispatcher);
 
         editModeTimer.Start();
     }
 
-    private void ProbeEditMode()
+    private void PollEditMode()
     {
         var mode = editManager?.EditMode ?? EditMode.None;
         if (mode == lastObservedEditMode)
@@ -212,6 +213,17 @@ public partial class MainWindow : INotifyPropertyChanged
         }
     }
 
+    private string currentEditState;
+    public string CurrentEditState
+    {
+        get => currentEditState;
+        set
+        {
+            currentEditState = value;
+            OnPropertyChanged(nameof(CurrentEditState));
+        }
+    }
+
     private void MapControl_KeyUp(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
@@ -297,11 +309,13 @@ public partial class MainWindow : INotifyPropertyChanged
                 if (isNearPolygon)
                 {
                     MapControl.Cursor = Cursors.Cross;
+                    EditState = EditState.Deleting;
                     deleteCandidate = coordinate;
                     break;
                 }
                 
                 MapControl.Cursor = Cursors.Arrow;
+                EditState = EditState.Editing;
                 coordinateIndex++;
             }
         }
@@ -341,7 +355,7 @@ public partial class MainWindow : INotifyPropertyChanged
             return;
         }
 
-        if (editStatus == EditStatus.Finished)
+        if (editState == EditState.Finished)
         {
             e.Handled = true;
             return;
@@ -360,26 +374,26 @@ public partial class MainWindow : INotifyPropertyChanged
                 GeometryHelpers.IsNear(polygon.Coordinates[0], world, pixelTolerance);
             if (isNearFirstPolygon)
             {
-                EditStatus = EditStatus.Accepted;
+                EditState = EditState.Accepted;
             }
             else
             {
-                EditStatus = EditStatus.Editing;
+                EditState = EditState.Editing;
             }
         }
 
         if (HasPolygonCrossingLines(polygon))
         {
-            if (!EditStatus.Equals(EditStatus.Error))
+            if (!EditState.Equals(EditState.Error))
             {
-                EditStatus = EditStatus.Error;
+                EditState = EditState.Error;
             }
         }
         else
         {
-            if (EditStatus.Equals(EditStatus.Error))
+            if (EditState.Equals(EditState.Error))
             {
-                EditStatus = EditStatus.Editing;
+                EditState = EditState.Editing;
             }
         }
     }
@@ -424,12 +438,12 @@ public partial class MainWindow : INotifyPropertyChanged
             return;
         }
 
-        if (editStatus == EditStatus.Finished)
+        if (editState == EditState.Finished)
         {
             return;
         }
 
-        if (editStatus == EditStatus.Accepted)
+        if (editState == EditState.Accepted)
         {
             ClosePolygon();
             e.Handled = true;
@@ -447,7 +461,7 @@ public partial class MainWindow : INotifyPropertyChanged
         
         editManager?.AddVertex(polygon.Coordinates[0]!); // Close by adding first coordinate again
         editManager!.EditMode = EditMode.None;
-        EditStatus = EditStatus.Finished;
+        EditState = EditState.Finished;
     }
 
     private bool CanDeleteCoordinate()
@@ -461,6 +475,7 @@ public partial class MainWindow : INotifyPropertyChanged
     private bool isDragging;
     private void StartDragCoordinate(MouseButtonEventArgs e)
     {
+        EditState = EditState.Dragging;
         if (editManager == null || 
             editLayer==null)
         {
@@ -482,7 +497,7 @@ public partial class MainWindow : INotifyPropertyChanged
     private void DragCoordinate(MouseEventArgs e)
     {
         if (!isDragging || e.LeftButton != MouseButtonState.Pressed) return;
-
+        
         var point = e.GetPosition(MapControl);
         editManager?.Dragging(new NetTopologySuite.Geometries.Point(point.X, point.Y));
         editManager?.Layer?.DataHasChanged();
@@ -590,7 +605,7 @@ public partial class MainWindow : INotifyPropertyChanged
         
         CancelEditButton.IsEnabled = false;
         StartEditButton.IsEnabled = true;
-        EditStatus = EditStatus.None;
+        EditState = EditState.None;
     }
 
     private void RemoveEditingWidget()
@@ -615,7 +630,7 @@ public partial class MainWindow : INotifyPropertyChanged
     private void StartEdit_Click(object sender, RoutedEventArgs e)
     {
         hasDeleted = false;
-        EditStatus = EditStatus.Editing;
+        EditState = EditState.Editing;
 
         if (editingWidget != null)
         {
@@ -636,15 +651,15 @@ public partial class MainWindow : INotifyPropertyChanged
         StartEditButton.IsEnabled = false;
     }
 
-    private EditStatus editStatus = EditStatus.None;
+    private EditState editState = EditState.None;
 
-    private EditStatus EditStatus
+    private EditState EditState
     {
-        get => editStatus;
+        get => editState;
         set
         {
-            editStatus = value;
-            if (editStatus == EditStatus.Finished)
+            editState = value;
+            if (editState == EditState.Finished)
             {
                 SaveEditButton.IsEnabled = true;
             }
@@ -654,6 +669,7 @@ public partial class MainWindow : INotifyPropertyChanged
             }
 
             SetEditStyles();
+            CurrentEditState = editState.ToString();
         }
     }
 
@@ -668,19 +684,19 @@ public partial class MainWindow : INotifyPropertyChanged
         StyleCollection styleCollection = new StyleCollection();
         styleCollection.Styles.Add(this.vertexStyle);
 
-        switch (EditStatus)
+        switch (EditState)
         {
-            case EditStatus.Error:
+            case EditState.Error:
                 styleCollection.Styles.Add(this.errorVectorStyle);
                 break;
-            case EditStatus.Accepted:
+            case EditState.Accepted:
                 styleCollection.Styles.Add(this.acceptedVectorStyle);
                 break;
-            case EditStatus.Finished:
+            case EditState.Finished:
                 styleCollection.Styles.Add(this.finishedVectorStyle);
                 break;
-            case EditStatus.Editing:
-            case EditStatus.None:
+            case EditState.Editing:
+            case EditState.None:
             default:
                 styleCollection.Styles.Add(this.editingVectorStyle);
                 break;
@@ -704,7 +720,7 @@ public partial class MainWindow : INotifyPropertyChanged
 
         CancelEditButton.IsEnabled = false;
         StartEditButton.IsEnabled = true;
-        EditStatus = EditStatus.None;
+        EditState = EditState.None;
     }
 
     private void SavePolygon()
