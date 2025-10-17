@@ -23,6 +23,7 @@ public enum EditState
     Finished,
     Editing,
     Deleting,
+    FinishedDeleting,
     Dragging,
 }
 
@@ -135,9 +136,7 @@ public partial class MainWindow : INotifyPropertyChanged
         lastObservedEditMode = mode;
         OnPropertyChanged(nameof(CurrentEditMode));
     }
-
-    private bool hasDeleted;
-
+    
     public EditMode EditMode => editManager?.EditMode ?? EditMode.None;
 
     private bool isShiftHeld;
@@ -164,7 +163,7 @@ public partial class MainWindow : INotifyPropertyChanged
             {
                 if (editManager != null && previousEditMode.HasValue)
                 {
-                    if (!hasDeleted)
+                    if (EditState == EditState.FinishedDeleting)
                     {
                         editManager.EditMode = previousEditMode.Value;
                     }
@@ -193,7 +192,7 @@ public partial class MainWindow : INotifyPropertyChanged
             if (isCtrlHeld)
             {
                 if (editManager?.EditMode == EditMode.AddPolygon ||
-                    editManager?.EditMode == EditMode.DrawingPolygon || 
+                    editManager?.EditMode == EditMode.DrawingPolygon ||
                     editManager?.EditMode == EditMode.Modify)
                 {
                     previousEditMode = editManager.EditMode;
@@ -214,6 +213,7 @@ public partial class MainWindow : INotifyPropertyChanged
     }
 
     private string currentEditState;
+
     public string CurrentEditState
     {
         get => currentEditState;
@@ -285,26 +285,26 @@ public partial class MainWindow : INotifyPropertyChanged
     private void MapControl_PreviewMouseMove(object sender, MouseEventArgs e)
     {
         DragCoordinate(e);
-        
+
         // Maybe create this on click, so we keep in memory and do not need to recalculate every time
         Polygon? polygon = GetCurrentSketchPolygon();
 
         if (IsShiftHeld &&
-            (editManager?.EditMode == EditMode.None || 
+            (editManager?.EditMode == EditMode.None ||
              editManager?.EditMode == EditMode.Modify) &&
             polygon != null &&
             polygon.Coordinates.Length > 5)
         {
             var world = GetWorldPoint(e);
             double pixelTolerance = 12.0 * MapControl.Map.Navigator.Viewport.Resolution;
-            
+
             deleteCandidate = null;
             int coordinateIndex = 0;
             foreach (Coordinate coordinate in polygon.Coordinates)
             {
                 bool isHoverVertex = coordinateIndex == polygon.Coordinates.Length - 2;
                 bool isNearPolygon = !isHoverVertex &&
-                                     world != null && 
+                                     world != null &&
                                      GeometryHelpers.IsNear(coordinate, world, pixelTolerance);
                 if (isNearPolygon)
                 {
@@ -313,21 +313,21 @@ public partial class MainWindow : INotifyPropertyChanged
                     deleteCandidate = coordinate;
                     break;
                 }
-                
+
                 MapControl.Cursor = Cursors.Arrow;
                 EditState = EditState.Editing;
                 coordinateIndex++;
             }
         }
 
-        if (IsCtrlHeld && 
-            (editManager?.EditMode == EditMode.None || 
-             editManager?.EditMode==EditMode.Modify) && 
+        if (IsCtrlHeld &&
+            (editManager?.EditMode == EditMode.None ||
+             editManager?.EditMode == EditMode.Modify) &&
             polygon != null)
         {
             MPoint world = GetWorldPoint(e);
             double pixelTolerance = 12.0 * MapControl.Map.Navigator.Viewport.Resolution;
-            
+
             foreach (Coordinate coordinate in polygon.Coordinates)
             {
                 bool isNearPolygon = world != null && GeometryHelpers.IsNear(coordinate, world, pixelTolerance);
@@ -404,7 +404,7 @@ public partial class MainWindow : INotifyPropertyChanged
         {
             throw new ArgumentNullException(nameof(editLayer));
         }
-        
+
         Point worldPoint = e.GetPosition(MapControl);
         MapInfo mapInfo = MapControl.GetMapInfo(new ScreenPosition(worldPoint.X, worldPoint.Y), [editLayer]);
         MPoint world = mapInfo.WorldPosition;
@@ -416,19 +416,19 @@ public partial class MainWindow : INotifyPropertyChanged
         Debug.WriteLine("Left mouse button down");
 
         if (IsShiftHeld &&
-            (editManager?.EditMode == EditMode.None || 
+            (editManager?.EditMode == EditMode.None ||
              editManager?.EditMode == EditMode.Modify) &&
             deleteCandidate != null)
         {
             DeleteCoordinate(e);
         }
-        
-        if(IsCtrlHeld && 
-           (editManager?.EditMode == EditMode.None || 
-            editManager?.EditMode == EditMode.Modify) && 
-           isDragMode)
+
+        if (IsCtrlHeld &&
+            (editManager?.EditMode == EditMode.None ||
+             editManager?.EditMode == EditMode.Modify) &&
+            isDragMode)
         {
-           StartDragCoordinate(e); 
+            StartDragCoordinate(e);
         }
 
         if (editManager?.EditMode != EditMode.AddPolygon &&
@@ -458,7 +458,7 @@ public partial class MainWindow : INotifyPropertyChanged
         {
             return;
         }
-        
+
         editManager?.AddVertex(polygon.Coordinates[0]!); // Close by adding first coordinate again
         editManager!.EditMode = EditMode.None;
         EditState = EditState.Finished;
@@ -468,25 +468,26 @@ public partial class MainWindow : INotifyPropertyChanged
     {
         // Hover vertex cant be deleted
         // The polygon must have four or more vertices
-        
+
         return false;
     }
 
     private bool isDragging;
+
     private void StartDragCoordinate(MouseButtonEventArgs e)
     {
         EditState = EditState.Dragging;
-        if (editManager == null || 
-            editLayer==null)
+        if (editManager == null ||
+            editLayer == null)
         {
             return;
         }
-        
+
         editManager.EndEdit();
         editManager.EditMode = EditMode.Modify;
         var point = e.GetPosition(MapControl);
         var mapInfo = MapControl.GetMapInfo(new ScreenPosition(point.X, point.Y), new[] { editLayer });
-        
+
         isDragging = editManager.StartDragging(mapInfo, editManager.VertexRadius);
         if (isDragging)
         {
@@ -497,7 +498,7 @@ public partial class MainWindow : INotifyPropertyChanged
     private void DragCoordinate(MouseEventArgs e)
     {
         if (!isDragging || e.LeftButton != MouseButtonState.Pressed) return;
-        
+
         var point = e.GetPosition(MapControl);
         editManager?.Dragging(new NetTopologySuite.Geometries.Point(point.X, point.Y));
         editManager?.Layer?.DataHasChanged();
@@ -518,15 +519,15 @@ public partial class MainWindow : INotifyPropertyChanged
         editManager?.Layer?.DataHasChanged();
         MapControl.Refresh();
     }
-    
+
     private void DeleteCoordinate(MouseButtonEventArgs e)
     {
-        if (editManager == null || 
+        if (editManager == null ||
             editLayer == null)
         {
             return;
-        }        
-        
+        }
+
         Point worldPoint = e.GetPosition(MapControl);
         MapInfo mapInfo = MapControl.GetMapInfo(new ScreenPosition(worldPoint.X, worldPoint.Y), new[] { editLayer });
 
@@ -538,8 +539,9 @@ public partial class MainWindow : INotifyPropertyChanged
         editManager.EndEdit();
         editManager.Layer?.DataHasChanged();
         MapControl.Map.Refresh();
-        
-        hasDeleted = true;
+
+        // hasDeleted = true;
+        EditState = EditState.FinishedDeleting;
         MapControl.Cursor = Cursors.Arrow;
     }
 
@@ -602,7 +604,7 @@ public partial class MainWindow : INotifyPropertyChanged
     private void CancelEdit()
     {
         RemoveEditingWidget();
-        
+
         CancelEditButton.IsEnabled = false;
         StartEditButton.IsEnabled = true;
         EditState = EditState.None;
@@ -629,14 +631,13 @@ public partial class MainWindow : INotifyPropertyChanged
 
     private void StartEdit_Click(object sender, RoutedEventArgs e)
     {
-        hasDeleted = false;
         EditState = EditState.Editing;
 
         if (editingWidget != null)
         {
             return;
         }
-        
+
         this.editManager = new EditManager
         {
             Layer = editLayer,
@@ -646,7 +647,7 @@ public partial class MainWindow : INotifyPropertyChanged
         editingWidget = new Mapsui.Nts.Widgets.EditingWidget(editManager);
         MapControl?.Map.Widgets.Add(editingWidget);
         SetEditStyles();
-            
+
         CancelEditButton.IsEnabled = true;
         StartEditButton.IsEnabled = false;
     }
@@ -742,7 +743,7 @@ public partial class MainWindow : INotifyPropertyChanged
         {
             OnPropertyChanged(propertyName);
         }
-        
+
         return true;
     }
 
