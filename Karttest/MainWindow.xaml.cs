@@ -40,6 +40,7 @@ public partial class MainWindow : INotifyPropertyChanged
 
     private DispatcherTimer? editModeTimer;
     private EditMode lastObservedEditMode = EditMode.None;
+    private readonly double basePixelTolerance = 20.0;
 
     private readonly VectorStyle errorVectorStyle = new VectorStyle
     {
@@ -296,7 +297,7 @@ public partial class MainWindow : INotifyPropertyChanged
             polygon.Coordinates.Length > 5)
         {
             var world = GetWorldPoint(e);
-            double pixelTolerance = 12.0 * MapControl.Map.Navigator.Viewport.Resolution;
+            double pixelTolerance = (basePixelTolerance / 2) * MapControl.Map.Navigator.Viewport.Resolution;
 
             deleteCandidate = null;
             int coordinateIndex = 0;
@@ -326,7 +327,7 @@ public partial class MainWindow : INotifyPropertyChanged
             polygon != null)
         {
             MPoint world = GetWorldPoint(e);
-            double pixelTolerance = 12.0 * MapControl.Map.Navigator.Viewport.Resolution;
+            double pixelTolerance = (basePixelTolerance / 2) * MapControl.Map.Navigator.Viewport.Resolution;
 
             foreach (Coordinate coordinate in polygon.Coordinates)
             {
@@ -369,7 +370,7 @@ public partial class MainWindow : INotifyPropertyChanged
         if (polygon.Coordinates.Length > 2)
         {
             var world = GetWorldPoint(e);
-            double pixelTolerance = 20.0 * MapControl.Map.Navigator.Viewport.Resolution;
+            double pixelTolerance = basePixelTolerance * MapControl.Map.Navigator.Viewport.Resolution;
             bool isNearFirstPolygon =
                 GeometryHelpers.IsNear(polygon.Coordinates[0], world, pixelTolerance);
             if (isNearFirstPolygon)
